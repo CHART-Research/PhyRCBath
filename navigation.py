@@ -18,16 +18,18 @@ class Navigation:
         :return: a list of the (x, y, z) coordinates of the sponge object
         """
         direction, rot, dist = utils.move(self.robot.data['position'], target_position, self.robot.data['rotation'][1])
-        if direction == "Left" :
-            self.robot.TurnLeft(rot, 1)
+        if(rot < 175):
+            if direction == "Left" :
+                self.robot.TurnLeft(rot, 1)
+            else:
+                self.robot.TurnRight (rot, 1)
+            self.environment.step(utils.calculate_step_rotation(rot)) 
+            self.robot.MoveForward(dist, 1)
+            self.environment.step(utils.calculate_step_translation(dist))
         else:
-            self.robot.TurnRight (rot, 1)
-
-        # performing rotation action with required time step
-        self.environment.step(utils.calculate_step_rotation(rot)) 
-        self.robot.MoveForward(dist, 1)
-        self.environment.step(utils.calculate_step_translation(dist))
-
+            self.robot.MoveBack(dist, 1)
+            self.environment.step(utils.calculate_step_translation(dist))
+        
         if(target_rotation!= None):
         # performing rotation action with required time step
             direction, rot  = utils.rotate(self.robot.data['rotation'][1], target_rotation)
@@ -46,7 +48,7 @@ class Navigation:
         """
         self.robot.IKTargetDoMove(
             position=target_position,
-            duration=2,
+            duration=3,
             speed_based=False,
         )
         self.robot.WaitDo()
