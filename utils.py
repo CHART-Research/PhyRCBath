@@ -37,8 +37,8 @@ def random_sponge_pose(sponge):
     :param robot: robot object
     :return: robot object with updated position and rotation
     """
-    randomX = np.random.uniform(0, 1)*0.1 - 0.05
-    randomZ = np.random.uniform(0, 1)*0.1  - 0.05
+    randomX = np.random.uniform(0, 1)*0.02 - 0.01
+    randomZ = np.random.uniform(0, 1)*0.02  - 0.01
     randomR = np.random.randint(0, 90) - 45
     sponge_pos = sponge.data['position']
     sponge_orientation = sponge.data['rotation']
@@ -111,7 +111,7 @@ def calculate_step_rotation(rotation):
     :param rotation: rotation 
     :return: time step as an int
     """
-    return int (rotation * 300/90)
+    return int (rotation * 300/90 + 100)
 
 
 def calculate_step_translation(distance):
@@ -120,4 +120,4 @@ def calculate_step_translation(distance):
     :param rotation: rotation 
     :return: time step as an int
     """
-    return int(distance*100 + 100) 
+    return int(distance * 400) 
