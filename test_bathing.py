@@ -29,26 +29,29 @@ def _main(use_graphics=False, dev=None):
 
         print(text) 
     # Initialize the environment
-    random_seed = utils.manikin_randomizer(True) # Comment for submission
+    random_seed = utils.manikin_randomizer(False) # Comment for submission
     #print(random_seed)
-    env = BathingEnv(graphics=use_graphics, seed=random_seed) if dev == False else BathingEnv(graphics=use_graphics, executable_file="@editor")
+    env = BathingEnv(graphics=use_graphics) if dev == False else BathingEnv(graphics=use_graphics, executable_file="@editor")
     robot = env.get_robot()
     sponge = env.get_sponge()
- 
+    gripper = env.get_gripper()
     p = perception.Perception(env)
     nav = navigation.Navigation(env, robot)
     env.step(100) # wait for cameras to initialise
     p.take_pictures()
+    
     p.generate_landmarks() # generate mediapipe landmarks
     print(p.manikin_landmarks)
-    nose = p.get_manikin(body_part="NOSE")
+    bathing_side = "RIGHT"
+    opp_bathing_side = "LEFT"
+    nose = p.get_manikin(body_part='NOSE')
     l_eye = p.get_manikin(body_part="LEFT_EYE")
     foot =  p.get_manikin(body_part="RIGHT_ANKLE")
     lfoot =  p.get_manikin(body_part="LEFT_ANKLE")
-    depth =  p.get_depth (0, "NOSE")
-    depth2 =  p.get_depth (2, "LEFT_EYE")
-    depth3 =  p.get_depth (32, "RIGHT_ANKLE")
-    depth4 =  p.get_depth (117, "LEFT_ANKLE")
+    depth =  p.get_depth (body_part= "NOSE")
+    depth2 =  p.get_depth ( body_part= "LEFT_EYE")
+    depth3 =  p.get_depth ( body_part= "RIGHT_ANKLE")
+    depth4 =  p.get_depth (body_part= "LEFT_ANKLE")
     print("depth: ", depth)
     print("nose: ", nose)
     print("depth2: ", depth2)
@@ -59,11 +62,15 @@ def _main(use_graphics=False, dev=None):
     print("lfoot: ", lfoot)
     p.take_pictures()
     #env.Pend()
+    if (nose[2]  > 0):
+        bathing_side = "LEFT"
+        opp_bathing_side = "RIGHT"
+
     depth =  p.get_depth (0, "NOSE")
     print("depth: ", depth)
     #env.Pend()
     # read waypoints from json file
-    with open('waypoints.json') as f:
+    with open('./waypoints.json') as f:
         waypoints_data = json.load(f)
         print(waypoints_data)
     
@@ -71,19 +78,17 @@ def _main(use_graphics=False, dev=None):
     print(robot.data['rotation'])
 
 
-    #env.Pend()
-    # random robot pose and sponge. Comment this section for submission! 
-    #robot = utils.random_robot_pose(robot)
-    #sponge = utils.random_sponge_pose(sponge)
-    #env.step(100) #waiting for robot and sponge to stabilise
-    #----------------------------------------------#
-    # env.Pend()
     # First, raise the gripper to a safe height to avoid obstacles like the chest
     lift_gripper_position = [robot.data['position'][0], sponge.data['position'][1]+ 0.15, robot.data['position'][2]]
     print(f"Raising gripper to safe height: {lift_gripper_position}")
     nav.movegripper(lift_gripper_position)
     #env.Pend()
 
+    robot.IKTargetDoRotate(rotation=[10, 90, 0],
+                duration=2,
+                speed_based=False)
+    robot.WaitDo()
+    # env.Pend()
     # loading grasping position for sponge
     grasping_position = waypoints_data['grasping']['position']
     grasping_rotation = waypoints_data['grasping']['rotation']
@@ -104,13 +109,13 @@ def _main(use_graphics=False, dev=None):
     fine_tune_position = [sponge.data['position'][0], sponge.data['position'][1] + 0.2, sponge.data['position'][2]]  # Position above the sponge at safe height
     print(f"Using IK to position above the sponge: {fine_tune_position}")
     nav.movegripper(fine_tune_position)
-
+    gripper.GripperOpen()
     # Lower the gripper to reach the sponge
     lower_position = [sponge.data['position'][0], sponge.data['position'][1]+0.02, sponge.data['position'][2] + 0.05]
     print(f"Lowering gripper to reach sponge: {lower_position}")
     nav.movegripper(lower_position)
     # Control the gripper to grasp the sponge
-    gripper = env.get_gripper()
+
     gripper.GripperClose()
     #env.step(300)
 
@@ -149,80 +154,61 @@ def _main(use_graphics=False, dev=None):
     lift_gripper_position = [robot.data['position'][0], 1.5, robot.data['position'][2]]
     print(f"Back to safe position: {lift_gripper_position}")
     nav.movegripper(lift_gripper_position)
+
+
     #env.step(300)
 
     #Decide which side of the bed is the most appropriate for bathing based on the manikin CoG
 
-
-
-    #Move out 
-    robot.MoveBack(0.7, 1)
-    env.step(utils.calculate_step_translation(0.7))
-
-    #Move to head
-    nav.goto(waypoints_data['bedhead']['position'], waypoints_data['bedhead']['rotation'])
-    
-    #Move to tl 
-    nav.goto(waypoints_data['bedtl']['position'], waypoints_data['bedtl']['rotation'])
-     #env.Pend()
+        #Move to head
+    if bathing_side == "RIGHT":
+        #Move out 
+        robot.MoveBack(0.7, 1)
+        env.step(utils.calculate_step_translation(0.7))
+        
+        nav.goto(waypoints_data['bedhead']['position'], waypoints_data['bedhead']['rotation'])
+        
+        #Move to tl 
+        nav.goto(waypoints_data['bedtl']['position'], waypoints_data['bedtl']['rotation'])
+        nav.goto(waypoints_data['bathing1']['position'], waypoints_data['bathing1']['rotation'])
+        #env.Pend()
+    else:
+        nav.goto(waypoints_data['bathingr']['position'], waypoints_data['bathingr']['rotation'])
 
     #Move to bathing area
     nose = p.get_manikin(body_part="NOSE")
-    l_eye = p.get_manikin(body_part="LEFT_EYE")
-    depth =  p.get_depth (0, "NOSE")
-    depth2 =  p.get_depth (2, "LEFT_EYE")
-    bathing_start = waypoints_data['bathing1']['position']
-    print("depth: ", depth)
-    print("nose: ", nose)
-    print("depth2: ", depth2)
-    print("l_eye: ", l_eye)
+    opposite_shoulder = p.get_manikin(body_part= bathing_side + "_SHOULDER")
+    shoulder = p.get_manikin(body_part= opp_bathing_side + "_SHOULDER")
+    hip = p.get_manikin(body_part= opp_bathing_side + "_HIP")
+    opposite_hip = p.get_manikin(body_part= bathing_side + "_HIP")
+    nose[1] =  p.get_depth (body_part= "NOSE")
+    opposite_shoulder[1] =  p.get_depth (body_part = bathing_side + "_SHOULDER")
+    shoulder[1] =  p.get_depth (body_part= opp_bathing_side + "_SHOULDER")
+    opposite_hip[1] =  p.get_depth (body_part = bathing_side + "_HIP")
+    hip[1] =  p.get_depth (body_part= opp_bathing_side + "_HIP")
+    
+    belly = [(shoulder[0] + hip[0])/2.5, (shoulder[1] + hip[1])/2 ]
 
-    env.Pend()
-    #bathing_start[0] =  nose[0]  
-
-    direction, rot, dist = utils.move(robot.data['position'], bathing_start, robot.data['rotation'][1])
-    if direction == "Left" :
-        robot.TurnLeft(rot, 1)
-    else:
-        robot.TurnRight (rot, 1)
-
-    # performing rotation action with required time step
-    env.step(utils.calculate_step_rotation(rot)) 
-    robot.MoveForward(dist, 1)
-    env.step(utils.calculate_step_translation(dist))
-
-
-    if(waypoints_data['bathing1']['rotation'] != "None"):
-    # performing rotation action with required time step
-        direction, rot  = utils.rotate(robot.data['rotation'][1], waypoints_data['bathing1']['rotation'])
-        if direction == "Left" :
-            robot.TurnLeft(rot, 1)
-        else:
-            robot.TurnRight (rot, 1)
-        env.step(utils.calculate_step_rotation(rot))
-
-
-    fine_tune_position = [robot.data['position'][0], 0.8 + 0.2, nose[2]]  # Position above the sponge at safe height
-    print(f"Using IK to position above the sponge: {fine_tune_position}")
-    robot.IKTargetDoMove(
-        position=fine_tune_position,
-        duration=2,
-        speed_based=False,
-    )
-    robot.WaitDo()
-
+    nav.goto([belly[0],robot.data['position'][1], robot.data['position'][2]], robot.data['rotation'][1])
+    lift_gripper_position = [robot.data['position'][0],  belly[1] + 0.5 , nose[2]]  # Position above the sponge at safe height
     print(f"Lowering gripper to bath")
-    robot.IKTargetDoMove(
-        position=[robot.data['position'][0], 1, nose[2]],  
-        duration=1,
-        speed_based=False,
-    )
-    robot.WaitDo()
-    env.step(100)
-    # moving forward
-    robot.MoveForward(1, 1)
-    env.step(utils.calculate_step_translation(1))
-    env.Pend()
+    nav.movegripper(lift_gripper_position)
+    nav.movegripper([robot.data['position'][0],  belly[1] + 0.03, nose[2]])
+    nav.movegripper([robot.data['position'][0],  belly[1] + 0.03, shoulder[2]])
+    lift_gripper_position = [robot.data['position'][0], 2, robot.data['position'][2]]
+    nav.movegripper(lift_gripper_position)
+
+    for iteration in range(1, 3):
+        nav.goto([robot.data['position'][0]-0.1*iteration, robot.data['position'][1], robot.data['position'][2]], robot.data['rotation'][1])
+        lift_gripper_position = [robot.data['position'][0],  belly[1] + 0.5, nose[2]]  # Position above the sponge at safe height
+        print(f"Lowering gripper to bath")
+        nav.movegripper(lift_gripper_position)
+        nav.movegripper([robot.data['position'][0],  belly[1] + 0.03, nose[2]])
+        nav.movegripper([robot.data['position'][0],  belly[1] + 0.03, shoulder[2]])
+        lift_gripper_position = [robot.data['position'][0],  2, robot.data['position'][2]]
+        nav.movegripper(lift_gripper_position)
+   
+
 
 
 
